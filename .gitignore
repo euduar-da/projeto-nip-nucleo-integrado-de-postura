@@ -1,0 +1,106 @@
+# =========================
+# Python / Django
+# =========================
+
+backend/venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+*.log
+*.pot
+*.pyc
+
+db.sqlite3
+db.sqlite3-journal
+
+# Migrations geradas localmente
+# Se quiser versionar migrations, comente as linhas abaixo
+# backend/api/migrations/*.py
+# !backend/api/migrations/__init__.py
+
+
+# =========================
+# Variáveis de ambiente
+# =========================
+
+.env
+.env.local
+.env.development
+.env.production
+*.env
+
+
+# =========================
+# Django static/media
+# =========================
+
+backend/staticfiles/
+backend/media/
+
+
+# =========================
+# Node / React / Vite
+# =========================
+
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+
+frontend/.vite/
+frontend/.env
+frontend/.env.local
+frontend/.env.development
+frontend/.env.production
+
+
+# =========================
+# Arquivos do sistema
+# =========================
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+
+# =========================
+# VS Code
+# =========================
+
+.vscode/
+!.vscode/extensions.json
+
+
+# =========================
+# PyCharm / IDEs
+# =========================
+
+.idea/
+
+
+# =========================
+# Banco / backups locais
+# =========================
+
+*.dump
+*.backup
+*.bak
+*.sql.bak
+
+
+# =========================
+# Coverage / testes
+# =========================
+
+.coverage
+htmlcov/
+.pytest_cache/
+coverage/
+
+
+# =========================
+# Cache
+# =========================
+
+.cache/

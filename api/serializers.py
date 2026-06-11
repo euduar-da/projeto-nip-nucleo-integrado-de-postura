@@ -1,7 +1,6 @@
 from django.contrib.auth import authenticate
-from django.contrib.auth.hashers import make_password
 from rest_framework import serializers
-from .models import Paciente
+from .models import Usuario, Colaborador, Paciente
 
 
 class LoginSerializer(serializers.Serializer):
@@ -9,52 +8,59 @@ class LoginSerializer(serializers.Serializer):
     senha = serializers.CharField(write_only=True)
 
     def validate(self, data):
-        email = data.get('email')
-        senha = data.get('senha')
+        usuario = authenticate(username=data['email'], password=data['senha'])
 
-        colaborador = authenticate(username=email, password=senha)
-
-        if not colaborador:
+        if not usuario:
             raise serializers.ValidationError('E-mail ou senha inválidos.')
 
-        if not colaborador.is_active:
+        if not usuario.is_active:
             raise serializers.ValidationError('Conta inativa. Contate o administrador.')
 
-        data['colaborador'] = colaborador
+        data['usuario'] = usuario
         return data
-    
-class PacienteCadastroSerializer(serializers.ModelSerializer):
+
+
+class UsuarioCadastroSerializer(serializers.ModelSerializer):
     senha = serializers.CharField(write_only=True, min_length=6)
 
     class Meta:
-        model = Paciente
-        fields = [
-            'id',
-            'nome',
-            'login',
-            'senha',
-            'cpf',
-            'data_nascimento',
-        ]
-        read_only_fields = ['id']
+        model = Usuario
+        fields = ['email', 'senha', 'first_name', 'last_name']
+
+    def validate_email(self, value):
+        if Usuario.objects.filter(email=value).exists():
+            raise serializers.ValidationError('Já existe um usuário com este e-mail.')
+        return value
+
+
+class PacienteCadastroSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    senha = serializers.CharField(write_only=True, min_length=6)
+    first_name = serializers.CharField(max_length=150)
+    last_name = serializers.CharField(max_length=150)
+    cpf = serializers.CharField(max_length=14)
+    data_nascimento = serializers.DateField()
+
+    def validate_email(self, value):
+        if Usuario.objects.filter(email=value).exists():
+            raise serializers.ValidationError('Já existe um usuário com este e-mail.')
+        return value
 
     def validate_cpf(self, value):
         if Paciente.objects.filter(cpf=value).exists():
-            raise serializers.ValidationError('Já existe um paciente cadastrado com este CPF.')
-        return value
-
-    def validate_login(self, value):
-        if Paciente.objects.filter(login=value).exists():
-            raise serializers.ValidationError('Já existe um paciente cadastrado com este login.')
+            raise serializers.ValidationError('Já existe um paciente com este CPF.')
         return value
 
     def create(self, validated_data):
-        senha = validated_data.pop('senha')
-
-        paciente = Paciente(
-            **validated_data,
-            senha=make_password(senha)
+        usuario = Usuario.objects.create_user(
+            email=validated_data['email'],
+            password=validated_data['senha'],
+            first_name=validated_data['first_name'],
+            last_name=validated_data['last_name'],
         )
-
-        paciente.save()
+        paciente = Paciente.objects.create(
+            usuario=usuario,
+            cpf=validated_data['cpf'],
+            data_nascimento=validated_data['data_nascimento'],
+        )
         return paciente

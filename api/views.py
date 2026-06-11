@@ -10,8 +10,7 @@ from .serializers import LoginSerializer, PacienteCadastroSerializer
 
 class LoginView(APIView):
     """
-    RF01 - Login de Colaborador.
-    Endpoint público — não exige autenticação prévia.
+    RF01/RF02 - Login unificado para colaboradores e pacientes.
     """
     permission_classes = [AllowAny]
 
@@ -24,31 +23,40 @@ class LoginView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
-        colaborador = serializer.validated_data['colaborador']
-        token, _ = Token.objects.get_or_create(user=colaborador)
+        usuario = serializer.validated_data['usuario']
+        token, _ = Token.objects.get_or_create(user=usuario)
 
-        return Response({
+        response = {
             'token': token.key,
-            'perfil': colaborador.perfil,
-            'nome': colaborador.get_full_name(),
-            'email': colaborador.email,
-        }, status=status.HTTP_200_OK)
+            'tipo': 'paciente' if hasattr(usuario, 'paciente') else 'colaborador',
+            'nome': usuario.get_full_name(),
+            'email': usuario.email,
+        }
+
+        if hasattr(usuario, 'colaborador'):
+            response['perfil'] = usuario.colaborador.perfil
+
+        return Response(response, status=status.HTTP_200_OK)
 
 
 class LogoutView(APIView):
     """
-    Invalida o token do colaborador autenticado.
+    Invalida o token do usuário autenticado.
     """
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         if request.auth:
             request.auth.delete()
-        return Response({'mensagem': 'Logout realizado com sucesso.'}, status=status.HTTP_200_OK)
-    
+        return Response(
+            {'mensagem': 'Logout realizado com sucesso.'},
+            status=status.HTTP_200_OK
+        )
+
+
 class PacienteCadastroView(APIView):
     """
-    RF02 - Cadastro de Paciente.
+    RF04 - Cadastro de Paciente.
     Apenas colaboradores autenticados podem cadastrar pacientes.
     """
     permission_classes = [IsAuthenticated, IsColaborador]
@@ -68,8 +76,8 @@ class PacienteCadastroView(APIView):
             'mensagem': 'Paciente cadastrado com sucesso.',
             'paciente': {
                 'id': paciente.id,
-                'nome': paciente.nome,
-                'login': paciente.login,
+                'nome': paciente.usuario.get_full_name(),
+                'email': paciente.usuario.email,
                 'cpf': paciente.cpf,
                 'data_nascimento': paciente.data_nascimento,
             }

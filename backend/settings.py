@@ -58,13 +58,14 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'BancoSistemaNIP',
         'USER': 'postgres',
-        'PASSWORD': 'postgres',
-        'HOST': 'localhost',
+        'PASSWORD': '1234',
+        'HOST': '127.0.0.1',
         'PORT': '5432',
     }
 }
 
-AUTH_USER_MODEL = 'api.Colaborador'
+AUTH_USER_MODEL = 'api.Usuario'
+
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [

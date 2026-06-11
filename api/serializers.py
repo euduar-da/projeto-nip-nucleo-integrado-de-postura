@@ -1,5 +1,7 @@
 from django.contrib.auth import authenticate
+from django.contrib.auth.hashers import make_password
 from rest_framework import serializers
+from .models import Paciente
 
 
 class LoginSerializer(serializers.Serializer):
@@ -20,3 +22,39 @@ class LoginSerializer(serializers.Serializer):
 
         data['colaborador'] = colaborador
         return data
+    
+class PacienteCadastroSerializer(serializers.ModelSerializer):
+    senha = serializers.CharField(write_only=True, min_length=6)
+
+    class Meta:
+        model = Paciente
+        fields = [
+            'id',
+            'nome',
+            'login',
+            'senha',
+            'cpf',
+            'data_nascimento',
+        ]
+        read_only_fields = ['id']
+
+    def validate_cpf(self, value):
+        if Paciente.objects.filter(cpf=value).exists():
+            raise serializers.ValidationError('Já existe um paciente cadastrado com este CPF.')
+        return value
+
+    def validate_login(self, value):
+        if Paciente.objects.filter(login=value).exists():
+            raise serializers.ValidationError('Já existe um paciente cadastrado com este login.')
+        return value
+
+    def create(self, validated_data):
+        senha = validated_data.pop('senha')
+
+        paciente = Paciente(
+            **validated_data,
+            senha=make_password(senha)
+        )
+
+        paciente.save()
+        return paciente

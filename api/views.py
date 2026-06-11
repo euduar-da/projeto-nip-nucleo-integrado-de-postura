@@ -3,8 +3,9 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from .permissions import IsColaborador
 
-from .serializers import LoginSerializer
+from .serializers import LoginSerializer, PacienteCadastroSerializer
 
 
 class LoginView(APIView):
@@ -44,3 +45,32 @@ class LogoutView(APIView):
         if request.auth:
             request.auth.delete()
         return Response({'mensagem': 'Logout realizado com sucesso.'}, status=status.HTTP_200_OK)
+    
+class PacienteCadastroView(APIView):
+    """
+    RF02 - Cadastro de Paciente.
+    Apenas colaboradores autenticados podem cadastrar pacientes.
+    """
+    permission_classes = [IsAuthenticated, IsColaborador]
+
+    def post(self, request):
+        serializer = PacienteCadastroSerializer(data=request.data)
+
+        if not serializer.is_valid():
+            return Response(
+                {'erro': serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        paciente = serializer.save()
+
+        return Response({
+            'mensagem': 'Paciente cadastrado com sucesso.',
+            'paciente': {
+                'id': paciente.id,
+                'nome': paciente.nome,
+                'login': paciente.login,
+                'cpf': paciente.cpf,
+                'data_nascimento': paciente.data_nascimento,
+            }
+        }, status=status.HTTP_201_CREATED)

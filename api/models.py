@@ -1,28 +1,78 @@
+from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.utils import timezone
 
-# PARTE 1: Tabelas Independentes
 
+# ------------------------------------------------------------------
+# Manager customizado para o Colaborador (necessário para login por email)
+# ------------------------------------------------------------------
+class ColaboradorManager(BaseUserManager):
+    def create_user(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError('O e-mail é obrigatório.')
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('perfil', 'admin')
+        return self.create_user(email, password, **extra_fields)
+
+
+# ------------------------------------------------------------------
+# Colaborador — substitui o User padrão do Django (RF01)
+# ------------------------------------------------------------------
+class Colaborador(AbstractUser):
+    class Perfil(models.TextChoices):
+        ADMIN = 'admin', 'Administrador'
+        FISIOTERAPEUTA = 'fisioterapeuta', 'Fisioterapeuta'
+        RECEPCIONISTA = 'recepcionista', 'Recepcionista'
+        COLABORADOR = 'colaborador', 'Colaborador'
+
+    username = None
+    email = models.EmailField(unique=True, verbose_name='E-mail')
+
+    perfil = models.CharField(
+        max_length=20,
+        choices=Perfil.choices,
+        default=Perfil.COLABORADOR,
+        verbose_name='Perfil'
+    )
+
+    objects = ColaboradorManager()
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['first_name', 'last_name']
+
+    class Meta:
+        verbose_name = 'Colaborador'
+        verbose_name_plural = 'Colaboradores'
+
+    def __str__(self):
+        return f'{self.get_full_name()} ({self.email})'
+
+
+# ------------------------------------------------------------------
+# Paciente
+# ------------------------------------------------------------------
 class Paciente(models.Model):
     nome = models.CharField(max_length=150)
     login = models.CharField(max_length=50, unique=True)
     senha = models.CharField(max_length=255)
-    # Mantidos por causa da Regra de Negócio RN-01:
-    cpf = models.CharField(max_length=14, unique=True) 
+    cpf = models.CharField(max_length=14, unique=True)
     data_nascimento = models.DateField()
 
     def __str__(self):
         return self.nome
 
-class Colaborador(models.Model):
-    nome = models.CharField(max_length=150)
-    login = models.CharField(max_length=50, unique=True)
-    senha = models.CharField(max_length=255)
-    perfil = models.CharField(max_length=50) # Ex: 'FISIOTERAPEUTA'
 
-    def __str__(self):
-        return self.nome
-
+# ------------------------------------------------------------------
+# Serviço
+# ------------------------------------------------------------------
 class Servico(models.Model):
     nome = models.CharField(max_length=100)
     descricao = models.TextField()
@@ -31,6 +81,10 @@ class Servico(models.Model):
     def __str__(self):
         return self.nome
 
+
+# ------------------------------------------------------------------
+# Exercício
+# ------------------------------------------------------------------
 class Exercicio(models.Model):
     nome = models.CharField(max_length=100)
     descricao_base = models.TextField()
@@ -38,46 +92,58 @@ class Exercicio(models.Model):
 
     def __str__(self):
         return self.nome
-    
-    # PARTE 2: Tabelas Dependentes (Com Chaves Estrangeiras e Relacionamentos)
 
+
+# ------------------------------------------------------------------
+# Ficha Clínica
+# ------------------------------------------------------------------
 class FichaClinica(models.Model):
     data_criacao = models.DateField(default=timezone.now)
-    # Relação 1:1 com Paciente (O diamante 'POSSUI')
     paciente = models.OneToOneField(Paciente, on_delete=models.CASCADE)
 
     def __str__(self):
         return f"Ficha Clínica de {self.paciente.nome}"
 
+
+# ------------------------------------------------------------------
+# Anotação
+# ------------------------------------------------------------------
 class Anotacao(models.Model):
     conteudo = models.TextField()
     data = models.DateField(default=timezone.now)
     hora = models.TimeField(default=timezone.now)
-    # Relações N:1 (Os diamantes 'CONTEM' e 'REGISTRA')
     ficha_clinica = models.ForeignKey(FichaClinica, on_delete=models.CASCADE)
     colaborador = models.ForeignKey(Colaborador, on_delete=models.PROTECT)
 
+
+# ------------------------------------------------------------------
+# Sessão de atendimento
+# ------------------------------------------------------------------
 class Sessao(models.Model):
     data = models.DateField()
     horario = models.TimeField()
     status = models.CharField(max_length=50, default='Agendado')
-    # Relações N:1 (Os diamantes 'AGENDAR', 'REFERE-SE' e 'ATENDE')
     paciente = models.ForeignKey(Paciente, on_delete=models.CASCADE)
     servico = models.ForeignKey(Servico, on_delete=models.PROTECT)
     colaborador = models.ForeignKey(Colaborador, on_delete=models.SET_NULL, null=True, blank=True)
 
+
+# ------------------------------------------------------------------
+# Prescrição
+# ------------------------------------------------------------------
 class Prescricao(models.Model):
     series = models.IntegerField()
     repeticoes = models.IntegerField()
-    # Relação N:1 com Paciente (O diamante 'RECEBE')
     paciente = models.ForeignKey(Paciente, on_delete=models.CASCADE)
-    # Relação N:M com Exercício (O diamante 'COMPOE')
     exercicios = models.ManyToManyField(Exercicio)
 
+
+# ------------------------------------------------------------------
+# Movimentação Financeira
+# ------------------------------------------------------------------
 class MovimentacaoFinanceira(models.Model):
     tipo_transacao = models.CharField(max_length=50)
     valor = models.DecimalField(max_digits=10, decimal_places=2)
     data_movimentacao = models.DateField(default=timezone.now)
-    # Relações N:1 (Os diamantes 'EFETUA' e 'GERA')
     colaborador = models.ForeignKey(Colaborador, on_delete=models.PROTECT)
     servico = models.ForeignKey(Servico, on_delete=models.SET_NULL, null=True, blank=True)

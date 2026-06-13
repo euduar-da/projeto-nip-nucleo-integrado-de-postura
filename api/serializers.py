@@ -2,7 +2,6 @@ from django.contrib.auth import authenticate
 from rest_framework import serializers
 from .models import Usuario, Colaborador, Paciente
 
-
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     senha = serializers.CharField(write_only=True)
@@ -64,3 +63,32 @@ class PacienteCadastroSerializer(serializers.Serializer):
             data_nascimento=validated_data['data_nascimento'],
         )
         return paciente
+
+
+# ------------------------------------------------------------------
+# NOVO: Cadastro de Colaborador (Adaptado para a nova arquitetura)
+# ------------------------------------------------------------------
+class ColaboradorCadastroSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    senha = serializers.CharField(write_only=True, min_length=6)
+    first_name = serializers.CharField(max_length=150)
+    last_name = serializers.CharField(max_length=150)
+    perfil = serializers.ChoiceField(choices=Colaborador.Perfil.choices)
+
+    def validate_email(self, value):
+        if Usuario.objects.filter(email=value).exists():
+            raise serializers.ValidationError('Já existe um usuário cadastrado com este e-mail.')
+        return value
+
+    def create(self, validated_data):
+        usuario = Usuario.objects.create_user(
+            email=validated_data['email'],
+            password=validated_data['senha'],
+            first_name=validated_data['first_name'],
+            last_name=validated_data['last_name'],
+        )
+        colaborador = Colaborador.objects.create(
+            usuario=usuario,
+            perfil=validated_data['perfil']
+        )
+        return colaborador

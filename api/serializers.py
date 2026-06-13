@@ -1,7 +1,7 @@
 from django.contrib.auth import authenticate
 from django.contrib.auth.hashers import make_password
 from rest_framework import serializers
-from .models import Paciente, Colaborador
+from .models import Paciente, Colaborador, FichaClinica, Anotacao
 
 
 class LoginSerializer(serializers.Serializer):
@@ -68,3 +68,36 @@ class ColaboradorCadastroSerializer(serializers.ModelSerializer):
         colaborador.set_password(senha)
         colaborador.save()
         return colaborador
+
+
+class AnotacaoSerializer(serializers.ModelSerializer):
+    colaborador_nome = serializers.CharField(source='colaborador.get_full_name', read_only=True)
+    data = serializers.DateField(read_only=True)
+    hora = serializers.TimeField(read_only=True)
+
+    class Meta:
+        model = Anotacao
+        fields = ['id', 'conteudo', 'data', 'hora', 'colaborador_nome']
+        read_only_fields = ['id', 'data', 'hora', 'colaborador_nome']
+
+
+class FichaClinicaSerializer(serializers.ModelSerializer):
+    anotacoes = AnotacaoSerializer(many=True, read_only=True, source='anotacao_set')
+    paciente_nome = serializers.CharField(source='paciente.nome', read_only=True)
+
+    class Meta:
+        model = FichaClinica
+        fields = ['id', 'data_criacao', 'paciente', 'paciente_nome', 'anotacoes']
+        read_only_fields = ['id', 'data_criacao', 'paciente_nome', 'anotacoes']
+
+    def validate_paciente(self, value):
+        if FichaClinica.objects.filter(paciente=value).exists():
+            raise serializers.ValidationError('Este paciente já possui uma ficha clínica.')
+        return value
+
+
+class AnotacaoCriarSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Anotacao
+        fields = ['id', 'conteudo']
+        read_only_fields = ['id']

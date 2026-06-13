@@ -13,6 +13,7 @@ import {
   X,
   ChevronRight,
 } from "lucide-react";
+import { Login } from "./components/Login";
 import { Dashboard } from "./components/Dashboard";
 import { Patients } from "./components/Patients";
 import { Agenda } from "./components/Agenda";
@@ -41,6 +42,7 @@ const pageTitles: Record<Page, string> = {
 };
 
 export default function App() {
+  const [loggedIn, setLoggedIn] = useState(false);
   const [page, setPage] = useState<Page>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -54,6 +56,10 @@ export default function App() {
       case "financeiro": return <Financeiro />;
     }
   };
+
+  if (!loggedIn) {
+    return <Login onLogin={() => setLoggedIn(true)} />;
+  }
 
   return (
     <div className="flex h-screen bg-background overflow-hidden" style={{ fontFamily: "'Inter', 'DM Sans', sans-serif" }}>

@@ -1,49 +1,138 @@
-import { useState } from "react";
-import { Search, Plus, Filter, Phone, Mail, ChevronRight, X, User, Calendar, FileText } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Search, Plus, Mail, ChevronRight, X, User, Calendar, FileText, Loader2 } from "lucide-react";
 
-const patients = [
-  { id: 1, nome: "Ana Luiza Ferreira", cpf: "082.453.221-09", nascimento: "14/03/1985", telefone: "(11) 98765-4321", email: "ana.ferreira@email.com", convenio: "Unimed", diagnostico: "Lombalgia crônica", terapeuta: "Dr. Carlos Souza", sessoes: 12, total: 20, status: "ativo", inicio: "10/03/2026" },
-  { id: 2, nome: "Roberto Almeida", cpf: "134.561.890-55", nascimento: "22/07/1970", telefone: "(11) 97654-3210", email: "roberto.almeida@email.com", convenio: "Amil", diagnostico: "Pós-op joelho direito", terapeuta: "Dra. Patrícia Lima", sessoes: 8, total: 30, status: "ativo", inicio: "02/05/2026" },
-  { id: 3, nome: "Fernanda Costa", cpf: "219.876.543-12", nascimento: "05/11/1992", telefone: "(11) 96543-2109", email: "fernanda.costa@email.com", convenio: "Particular", diagnostico: "RPG – postura", terapeuta: "Dr. Carlos Souza", sessoes: 6, total: 10, status: "ativo", inicio: "01/04/2026" },
-  { id: 4, nome: "Marcos Oliveira", cpf: "304.987.654-33", nascimento: "30/01/1960", telefone: "(11) 95432-1098", email: "marcos.oliveira@email.com", convenio: "SulAmérica", diagnostico: "AVC – sequela motora", terapeuta: "Dra. Juliana Reis", sessoes: 20, total: 40, status: "ativo", inicio: "15/01/2026" },
-  { id: 5, nome: "Camila Santos", cpf: "387.654.321-77", nascimento: "18/09/1998", telefone: "(11) 94321-0987", email: "camila.santos@email.com", convenio: "Bradesco Saúde", diagnostico: "Lesão ligamentar tornozelo", terapeuta: "Dra. Patrícia Lima", sessoes: 4, total: 12, status: "ativo", inicio: "20/05/2026" },
-  { id: 6, nome: "Diego Mendes", cpf: "451.234.567-88", nascimento: "12/04/1978", telefone: "(11) 93210-9876", email: "diego.mendes@email.com", convenio: "Unimed", diagnostico: "Cervicalgia", terapeuta: "Dr. Carlos Souza", sessoes: 10, total: 10, status: "alta", inicio: "10/02/2026" },
-  { id: 7, nome: "Lúcia Pereira", cpf: "532.109.876-44", nascimento: "25/06/1955", telefone: "(11) 92109-8765", email: "lucia.pereira@email.com", convenio: "Particular", diagnostico: "Osteoartrite quadril", terapeuta: "Dra. Juliana Reis", sessoes: 2, total: 24, status: "ativo", inicio: "05/06/2026" },
-  { id: 8, nome: "Paulo Henrique Barros", cpf: "678.543.210-11", nascimento: "07/12/1988", telefone: "(11) 91098-7654", email: "paulo.barros@email.com", convenio: "Amil", diagnostico: "Hérnia de disco L4-L5", terapeuta: "Dr. Carlos Souza", sessoes: 15, total: 20, status: "ativo", inicio: "12/03/2026" },
-];
+const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
-const convenios = ["Todos", "Unimed", "Amil", "Particular", "SulAmérica", "Bradesco Saúde"];
+type Paciente = {
+  id: number;
+  nome: string;
+  email: string;
+  cpf: string;
+  data_nascimento: string;
+};
 
 export function Patients() {
+  const [patients, setPatients] = useState<Paciente[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const [selectedConvenio, setSelectedConvenio] = useState("Todos");
-  const [selectedStatus, setSelectedStatus] = useState("Todos");
-  const [selected, setSelected] = useState<(typeof patients)[0] | null>(null);
+  const [selected, setSelected] = useState<Paciente | null>(null);
   const [showNew, setShowNew] = useState(false);
 
-  const filtered = patients.filter((p) => {
-    const matchSearch = p.nome.toLowerCase().includes(search.toLowerCase()) || p.cpf.includes(search);
-    const matchConvenio = selectedConvenio === "Todos" || p.convenio === selectedConvenio;
-    const matchStatus = selectedStatus === "Todos" || p.status === selectedStatus.toLowerCase();
-    return matchSearch && matchConvenio && matchStatus;
+  // Estados do formulário de cadastro
+  const [cadastroLoading, setCadastroLoading] = useState(false);
+  const [cadastroErro, setCadastroErro] = useState("");
+  const [cadastroForm, setCadastroForm] = useState({
+    first_name: "",
+    last_name: "",
+    email: "",
+    senha: "",
+    cpf: "",
+    data_nascimento: "",
   });
+
+  // Busca pacientes da API
+  useEffect(() => {
+    const token = localStorage.getItem("nip_token");
+    if (!token) return;
+
+    fetch(`${API_URL}/api/pacientes/listar/`, {
+      headers: { Authorization: `Token ${token}` },
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Erro ao buscar pacientes");
+        return res.json();
+      })
+      .then((data) => setPatients(data))
+      .catch(() => setError("Não foi possível carregar os pacientes."))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filtered = patients.filter((p) => {
+    return (
+      p.nome.toLowerCase().includes(search.toLowerCase()) ||
+      p.cpf.includes(search)
+    );
+  });
+
+  const formatDate = (date: string) => {
+    if (!date) return "—";
+    const [y, m, d] = date.split("-");
+    return `${d}/${m}/${y}`;
+  };
+
+  const handleCadastrar = async () => {
+    setCadastroErro("");
+    setCadastroLoading(true);
+
+    const token = localStorage.getItem("nip_token");
+
+    try {
+      const response = await fetch(`${API_URL}/api/pacientes/cadastrar/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Token ${token}`,
+        },
+        body: JSON.stringify(cadastroForm),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const erros = data?.erro;
+        const mensagem =
+          erros?.email?.[0] ??
+          erros?.cpf?.[0] ??
+          erros?.senha?.[0] ??
+          erros?.first_name?.[0] ??
+          erros?.last_name?.[0] ??
+          erros?.data_nascimento?.[0] ??
+          "Erro ao cadastrar paciente.";
+        setCadastroErro(mensagem);
+        return;
+      }
+
+      // Adiciona o novo paciente na lista sem recarregar
+      setPatients((prev) => [...prev, {
+        id: data.paciente.id,
+        nome: data.paciente.nome,
+        email: data.paciente.email,
+        cpf: data.paciente.cpf,
+        data_nascimento: data.paciente.data_nascimento,
+      }]);
+
+      // Fecha modal e reseta form
+      setShowNew(false);
+      setCadastroForm({
+        first_name: "", last_name: "", email: "",
+        senha: "", cpf: "", data_nascimento: "",
+      });
+    } catch {
+      setCadastroErro("Não foi possível conectar ao servidor.");
+    } finally {
+      setCadastroLoading(false);
+    }
+  };
 
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Pacientes</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">{patients.length} pacientes cadastrados</p>
+          <p className="text-muted-foreground text-sm mt-0.5">
+            {loading ? "Carregando..." : `${patients.length} pacientes cadastrados`}
+          </p>
         </div>
         <button
-          onClick={() => setShowNew(true)}
+          onClick={() => { setShowNew(true); setCadastroErro(""); }}
           className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
         >
           <Plus size={16} /> Novo Paciente
         </button>
       </div>
 
-      {/* Filters */}
+      {/* Filtro de busca */}
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-52">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -54,99 +143,99 @@ export function Patients() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <select
-          className="px-3 py-2 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-          value={selectedConvenio}
-          onChange={(e) => setSelectedConvenio(e.target.value)}
-        >
-          {convenios.map((c) => <option key={c}>{c}</option>)}
-        </select>
-        <select
-          className="px-3 py-2 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-          value={selectedStatus}
-          onChange={(e) => setSelectedStatus(e.target.value)}
-        >
-          {["Todos", "Ativo", "Alta"].map((s) => <option key={s}>{s}</option>)}
-        </select>
       </div>
 
-      {/* Table */}
-      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-border bg-muted/40">
-              {["Paciente", "CPF", "Convênio", "Diagnóstico", "Terapeuta", "Sessões", "Status", ""].map((h) => (
-                <th key={h} className="text-left text-xs font-medium text-muted-foreground px-4 py-3">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {filtered.map((p) => (
-              <tr key={p.id} className="hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => setSelected(p)}>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="size-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
-                      <span className="text-xs font-medium text-primary">{p.nome.split(" ").map(w => w[0]).slice(0,2).join("")}</span>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{p.nome}</p>
-                      <p className="text-xs text-muted-foreground">{p.nascimento}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-sm text-muted-foreground">{p.cpf}</td>
-                <td className="px-4 py-3 text-sm">{p.convenio}</td>
-                <td className="px-4 py-3 text-sm text-muted-foreground max-w-36 truncate">{p.diagnostico}</td>
-                <td className="px-4 py-3 text-sm">{p.terapeuta}</td>
-                <td className="px-4 py-3 text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="h-1.5 w-20 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-primary rounded-full" style={{ width: `${(p.sessoes / p.total) * 100}%` }} />
-                    </div>
-                    <span className="text-xs text-muted-foreground">{p.sessoes}/{p.total}</span>
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.status === "ativo" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
-                    {p.status === "ativo" ? "Ativo" : "Alta"}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <ChevronRight size={16} className="text-muted-foreground" />
-                </td>
+      {/* Loading */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 size={24} className="animate-spin text-primary" />
+          <span className="ml-2 text-muted-foreground text-sm">Carregando pacientes...</span>
+        </div>
+      )}
+
+      {/* Erro de carregamento */}
+      {error && (
+        <div className="bg-destructive/10 text-destructive text-sm px-4 py-3 rounded-lg">
+          {error}
+        </div>
+      )}
+
+      {/* Tabela */}
+      {!loading && !error && (
+        <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-border bg-muted/40">
+                {["Paciente", "CPF", "Data de Nascimento", "E-mail", ""].map((h) => (
+                  <th key={h} className="text-left text-xs font-medium text-muted-foreground px-4 py-3">{h}</th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="text-center py-8 text-muted-foreground text-sm">
+                    Nenhum paciente encontrado.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((p) => (
+                  <tr
+                    key={p.id}
+                    className="hover:bg-muted/30 transition-colors cursor-pointer"
+                    onClick={() => setSelected(p)}
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="size-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                          <span className="text-xs font-medium text-primary">
+                            {p.nome.split(" ").map((w) => w[0]).slice(0, 2).join("")}
+                          </span>
+                        </div>
+                        <p className="text-sm font-medium text-foreground">{p.nome}</p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">{p.cpf}</td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(p.data_nascimento)}</td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">{p.email}</td>
+                    <td className="px-4 py-3">
+                      <ChevronRight size={16} className="text-muted-foreground" />
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-      {/* Patient Detail Modal */}
+      {/* Modal detalhe do paciente */}
       {selected && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-end" onClick={() => setSelected(null)}>
           <div className="bg-card h-full w-full max-w-md shadow-2xl overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-4 border-b border-border sticky top-0 bg-card z-10">
               <h2 className="font-semibold">Ficha do Paciente</h2>
-              <button onClick={() => setSelected(null)} className="text-muted-foreground hover:text-foreground"><X size={18} /></button>
+              <button onClick={() => setSelected(null)} className="text-muted-foreground hover:text-foreground">
+                <X size={18} />
+              </button>
             </div>
             <div className="p-5 space-y-5">
               <div className="flex items-center gap-4">
                 <div className="size-16 rounded-2xl bg-secondary flex items-center justify-center">
-                  <span className="text-xl font-semibold text-primary">{selected.nome.split(" ").map(w => w[0]).slice(0,2).join("")}</span>
+                  <span className="text-xl font-semibold text-primary">
+                    {selected.nome.split(" ").map((w) => w[0]).slice(0, 2).join("")}
+                  </span>
                 </div>
                 <div>
                   <h3 className="font-semibold text-lg">{selected.nome}</h3>
-                  <p className="text-sm text-muted-foreground">{selected.diagnostico}</p>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium mt-1 inline-block ${selected.status === "ativo" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
-                    {selected.status === "ativo" ? "Ativo" : "Alta"}
-                  </span>
+                  <p className="text-sm text-muted-foreground">{selected.email}</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 {[
                   { icon: User, label: "CPF", value: selected.cpf },
-                  { icon: Calendar, label: "Nascimento", value: selected.nascimento },
-                  { icon: Phone, label: "Telefone", value: selected.telefone },
+                  { icon: Calendar, label: "Nascimento", value: formatDate(selected.data_nascimento) },
                   { icon: Mail, label: "E-mail", value: selected.email },
                 ].map((item) => (
                   <div key={item.label} className="bg-muted/40 rounded-lg p-3">
@@ -157,30 +246,6 @@ export function Patients() {
                     <p className="text-sm font-medium truncate">{item.value}</p>
                   </div>
                 ))}
-              </div>
-
-              <div className="bg-muted/40 rounded-lg p-4">
-                <p className="text-xs text-muted-foreground mb-1">Convênio</p>
-                <p className="text-sm font-medium">{selected.convenio}</p>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium mb-2">Progresso do Tratamento</p>
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${(selected.sessoes / selected.total) * 100}%` }} />
-                  </div>
-                  <span className="text-sm text-muted-foreground shrink-0">{selected.sessoes}/{selected.total} sessões</span>
-                </div>
-                <div className="flex justify-between mt-1">
-                  <span className="text-xs text-muted-foreground">Início: {selected.inicio}</span>
-                  <span className="text-xs text-primary font-medium">{Math.round((selected.sessoes / selected.total) * 100)}% concluído</span>
-                </div>
-              </div>
-
-              <div className="bg-muted/40 rounded-lg p-4">
-                <p className="text-xs text-muted-foreground mb-1">Fisioterapeuta Responsável</p>
-                <p className="text-sm font-medium">{selected.terapeuta}</p>
               </div>
 
               <div className="flex gap-2">
@@ -196,42 +261,96 @@ export function Patients() {
         </div>
       )}
 
-      {/* New Patient Modal */}
+      {/* Modal novo paciente */}
       {showNew && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={() => setShowNew(false)}>
           <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg m-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-4 border-b border-border">
               <h2 className="font-semibold">Novo Paciente</h2>
-              <button onClick={() => setShowNew(false)} className="text-muted-foreground hover:text-foreground"><X size={18} /></button>
+              <button onClick={() => setShowNew(false)} className="text-muted-foreground hover:text-foreground">
+                <X size={18} />
+              </button>
             </div>
             <div className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: "Nome completo", placeholder: "Nome do paciente", span: 2 },
-                  { label: "CPF", placeholder: "000.000.000-00" },
-                  { label: "Data de nascimento", placeholder: "DD/MM/AAAA" },
-                  { label: "Telefone", placeholder: "(00) 00000-0000" },
-                  { label: "E-mail", placeholder: "email@exemplo.com" },
-                ].map((field) => (
-                  <div key={field.label} className={field.span === 2 ? "col-span-2" : ""}>
-                    <label className="text-xs font-medium text-muted-foreground block mb-1">{field.label}</label>
-                    <input className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-background" placeholder={field.placeholder} />
-                  </div>
-                ))}
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">Nome</label>
+                  <input
+                    className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-background"
+                    placeholder="Nome"
+                    value={cadastroForm.first_name}
+                    onChange={(e) => setCadastroForm({ ...cadastroForm, first_name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">Sobrenome</label>
+                  <input
+                    className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-background"
+                    placeholder="Sobrenome"
+                    value={cadastroForm.last_name}
+                    onChange={(e) => setCadastroForm({ ...cadastroForm, last_name: e.target.value })}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">E-mail</label>
+                  <input
+                    type="email"
+                    className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-background"
+                    placeholder="email@exemplo.com"
+                    value={cadastroForm.email}
+                    onChange={(e) => setCadastroForm({ ...cadastroForm, email: e.target.value })}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">Senha inicial</label>
+                  <input
+                    type="password"
+                    className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-background"
+                    placeholder="Mínimo 6 caracteres"
+                    value={cadastroForm.senha}
+                    onChange={(e) => setCadastroForm({ ...cadastroForm, senha: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">CPF</label>
+                  <input
+                    className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-background"
+                    placeholder="000.000.000-00"
+                    value={cadastroForm.cpf}
+                    onChange={(e) => setCadastroForm({ ...cadastroForm, cpf: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">Data de nascimento</label>
+                  <input
+                    type="date"
+                    className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-background"
+                    value={cadastroForm.data_nascimento}
+                    onChange={(e) => setCadastroForm({ ...cadastroForm, data_nascimento: e.target.value })}
+                  />
+                </div>
               </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground block mb-1">Convênio</label>
-                <select className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-background">
-                  {convenios.slice(1).map((c) => <option key={c}>{c}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground block mb-1">Diagnóstico / Queixa principal</label>
-                <textarea className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-background resize-none" rows={3} placeholder="Descreva o diagnóstico ou queixa principal..." />
-              </div>
+
+              {cadastroErro && (
+                <p className="text-sm text-destructive bg-destructive/10 px-3 py-2 rounded-lg">
+                  {cadastroErro}
+                </p>
+              )}
+
               <div className="flex gap-2 pt-1">
-                <button onClick={() => setShowNew(false)} className="flex-1 border border-border py-2.5 rounded-lg text-sm font-medium hover:bg-muted/40 transition-colors">Cancelar</button>
-                <button onClick={() => setShowNew(false)} className="flex-1 bg-primary text-primary-foreground py-2.5 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">Cadastrar</button>
+                <button
+                  onClick={() => setShowNew(false)}
+                  className="flex-1 border border-border py-2.5 rounded-lg text-sm font-medium hover:bg-muted/40 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleCadastrar}
+                  disabled={cadastroLoading}
+                  className="flex-1 bg-primary text-primary-foreground py-2.5 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-70"
+                >
+                  {cadastroLoading ? "Cadastrando..." : "Cadastrar"}
+                </button>
               </div>
             </div>
           </div>

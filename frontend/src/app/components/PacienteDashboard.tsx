@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import {
   Calendar,
@@ -21,6 +21,17 @@ import { motion, AnimatePresence } from "motion/react";
 
 const MONTHS = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const DAYS_SHORT = ["D","S","T","Q","Q","S","S"];
+const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+
+type PacientePerfil = {
+  id: number;
+  nome: string;
+  email: string;
+  cpf: string;
+  data_nascimento: string | null;
+  telefone?: string | null;
+  convenio?: string | null;
+};
 
 const services = [
   {
@@ -104,9 +115,41 @@ type AgendStep = 1 | 2 | 3 | 4;
 
 export function DashboardPaciente() {
   const { logout,user } = useAuth(); 
+  const [perfil, setPerfil] = useState<PacientePerfil | null>(null);
   const [tab, setTab] = useState<Tab>("inicio");
   const [selectedService, setSelectedService] = useState<(typeof services)[0] | null>(null);
 
+ useEffect(() => {
+  async function carregarPerfil() {
+    if (!user?.token) {
+      logout();
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/api/paciente/perfil/`, {
+        method: "GET",
+        headers: {
+          Authorization: `Token ${user.token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error("Erro ao buscar perfil");
+      }
+
+      setPerfil(data);
+    } catch (error) {
+      console.error("Erro ao buscar perfil:", error);
+    }
+  }
+
+  carregarPerfil();
+}, [user, logout]);
+  
   // Agendamento state
   const [agendStep, setAgendStep] = useState<AgendStep>(1);
   const [agendService, setAgendService] = useState<(typeof services)[0] | null>(null);
@@ -147,6 +190,28 @@ export function DashboardPaciente() {
     { id: "perfil", label: "Perfil", icon: User },
   ];
 
+  const nomePaciente = perfil?.nome ?? user?.nome ?? "Paciente";
+  const emailPaciente = perfil?.email ?? user?.email ?? "";
+
+  const iniciaisPaciente = nomePaciente
+    .split(" ")
+    .filter(Boolean)
+    .map((nome) => nome[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  function formatarData(data: string | null) {
+    if (!data) return "Não informado";
+
+    const apenasData = data.split("T")[0];
+    const [ano, mes, dia] = apenasData.split("-");
+
+    if (!ano || !mes || !dia) return data;
+
+    return `${dia}/${mes}/${ano}`;
+  }
+
   return (
     <div className="min-h-screen bg-background flex flex-col" style={{ fontFamily: "'Inter', 'DM Sans', sans-serif" }}>
       {/* Top header */}
@@ -183,7 +248,7 @@ export function DashboardPaciente() {
               {/* Hero */}
               <div className="px-4 pt-6 pb-5" style={{ background: "linear-gradient(135deg, #0c6478 0%, #0891b2 100%)" }}>
                 <p className="text-white/70 text-sm">Olá, bem-vindo(a) 👋</p>
-                <h1 className="text-white font-bold mt-0.5 mb-4">{user?.nome ?? "Paciente"}</h1>
+                <h1 className="text-white font-bold mt-0.5 mb-4">{nomePaciente}</h1>
                 <div className="bg-white/15 backdrop-blur rounded-2xl p-4">
                   <p className="text-white/80 text-xs mb-1">Próxima consulta</p>
                   <div className="flex items-center justify-between">
@@ -625,12 +690,12 @@ export function DashboardPaciente() {
               <div className="bg-card rounded-2xl border border-border shadow-sm p-5 flex items-center gap-4">
                 <div className="size-16 rounded-2xl bg-secondary flex items-center justify-center shrink-0">
                 <span className="text-2xl font-bold text-primary">
-                    {user?.nome?.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase() ?? "??"}
+                    {iniciaisPaciente || "??"}
                 </span>                
                 </div>
                 <div>
-                  <p className="font-bold text-foreground">{user?.nome ?? "Paciente"}</p>
-                  <p className="text-sm text-muted-foreground">{user?.email ?? ""}</p>
+                  <p className="font-bold text-foreground">{nomePaciente}</p>
+                  <p className="text-sm text-muted-foreground">{emailPaciente}</p>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium mt-1 inline-block">Paciente ativa</span>
                 </div>
               </div>
@@ -638,10 +703,8 @@ export function DashboardPaciente() {
               <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
                 <p className="text-xs font-semibold text-muted-foreground px-4 py-3 border-b border-border uppercase tracking-wide">Dados Pessoais</p>
                 {[
-                  { label: "CPF", value: "082.453.221-09" },
-                  { label: "Data de nascimento", value: "14/03/1985" },
-                  { label: "Telefone", value: "(11) 98765-4321" },
-                  { label: "Convênio", value: "Unimed" },
+                  { label: "CPF", value: perfil?.cpf ?? "Não informado" },
+                  { label: "Data de nascimento", value: formatarData(perfil?.data_nascimento ?? null) },
                 ].map((item) => (
                   <div key={item.label} className="flex justify-between items-center px-4 py-3 border-b border-border last:border-0">
                     <span className="text-sm text-muted-foreground">{item.label}</span>

@@ -196,3 +196,18 @@ class AnotacaoCriarView(APIView):
                 'colaborador_nome': request.user.get_full_name()
             }
         }, status=status.HTTP_201_CREATED)
+    
+class PacientePerfilView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            paciente = request.user.paciente
+            return Response({
+                'nome': request.user.get_full_name(),
+                'email': request.user.email,
+                'cpf': paciente.cpf,
+                'data_nascimento': paciente.data_nascimento,
+            }, status=status.HTTP_200_OK)
+        except:
+            return Response({'erro': 'Paciente não encontrado.'}, status=404)

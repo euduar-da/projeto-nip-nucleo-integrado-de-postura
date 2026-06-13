@@ -132,3 +132,17 @@ class AnotacaoCriarSerializer(serializers.ModelSerializer):
         model = Anotacao
         fields = ['id', 'conteudo']
         read_only_fields = ['id']
+
+class PacienteListSerializer(serializers.ModelSerializer):
+    nome = serializers.SerializerMethodField()
+    email = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Paciente
+        fields = ['id', 'nome', 'email', 'cpf', 'data_nascimento']
+
+    def get_nome(self, obj):
+        return obj.usuario.get_full_name()
+
+    def get_email(self, obj):
+        return obj.usuario.email

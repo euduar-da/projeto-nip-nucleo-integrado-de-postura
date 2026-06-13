@@ -7,13 +7,14 @@ from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from .permissions import IsColaborador
-from .models import FichaClinica, Anotacao
+from .models import FichaClinica, Anotacao, Paciente, Colaborador
 from .serializers import (
     LoginSerializer, 
     PacienteCadastroSerializer, 
     ColaboradorCadastroSerializer,
     FichaClinicaSerializer,
-    AnotacaoCriarSerializer
+    AnotacaoCriarSerializer,
+    PacienteListSerializer
 )
 
 class LoginView(APIView):
@@ -93,25 +94,14 @@ class PacienteCadastroView(APIView):
 
 
 class ColaboradorCadastroView(APIView):
-    """
-    RF - Cadastro de Colaborador.
-    Apenas colaboradores autenticados e com perfil 'admin' podem cadastrar novos colaboradores.
-    """
     permission_classes = [IsAuthenticated, IsColaborador]
 
     def post(self, request):
-        # Verifica se o colaborador logado tem o perfil de administrador
-        if request.user.colaborador.perfil != 'admin':
-            return Response(
-                {"erro": "Acesso negado. Apenas administradores podem cadastrar novos colaboradores."}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
-
         serializer = ColaboradorCadastroSerializer(data=request.data)
 
         if not serializer.is_valid():
             return Response(
-                {'erro': serializer.errors}, 
+                {'erro': serializer.errors},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -211,3 +201,27 @@ class PacientePerfilView(APIView):
             }, status=status.HTTP_200_OK)
         except:
             return Response({'erro': 'Paciente não encontrado.'}, status=404)
+        
+class PacienteListView(APIView):
+    """
+    Lista todos os pacientes. Apenas colaboradores autenticados.
+    """
+    permission_classes = [IsAuthenticated, IsColaborador]
+
+    def get(self, request):
+        pacientes = Paciente.objects.select_related('usuario').all()
+        serializer = PacienteListSerializer(pacientes, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class ColaboradorListView(APIView):
+    permission_classes = [IsAuthenticated, IsColaborador]
+
+    def get(self, request):
+        colaboradores = Colaborador.objects.select_related('usuario').all()
+        data = [{
+            'id': c.id,
+            'nome': c.usuario.get_full_name(),
+            'email': c.usuario.email,
+            'perfil': c.perfil,
+        } for c in colaboradores]
+        return Response(data, status=status.HTTP_200_OK)

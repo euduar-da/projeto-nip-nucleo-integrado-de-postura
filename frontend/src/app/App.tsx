@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "./context/AuthContext";
 import {
   LayoutDashboard,
   Users,
@@ -12,6 +13,7 @@ import {
   Menu,
   X,
   ChevronRight,
+  LogOut,
 } from "lucide-react";
 import { Login } from "./components/Login";
 import { Dashboard } from "./components/Dashboard";
@@ -20,6 +22,7 @@ import { Agenda } from "./components/Agenda";
 import { Prontuario } from "./components/Prontuario";
 import { Profissionais } from "./components/Profissionais";
 import { Financeiro } from "./components/Financeiro";
+import { DashboardPaciente } from "./components/PacienteDashboard";
 
 type Page = "dashboard" | "pacientes" | "agenda" | "prontuario" | "profissionais" | "financeiro";
 
@@ -42,35 +45,45 @@ const pageTitles: Record<Page, string> = {
 };
 
 export default function App() {
-  const [loggedIn, setLoggedIn] = useState(false);
+  const { user, logout } = useAuth(); // ← dados reais do usuário logado
   const [page, setPage] = useState<Page>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const initials = user?.nome
+    ? user.nome.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()
+    : "??";
+
   const renderPage = () => {
     switch (page) {
-      case "dashboard": return <Dashboard />;
-      case "pacientes": return <Patients />;
-      case "agenda": return <Agenda />;
-      case "prontuario": return <Prontuario />;
-      case "profissionais": return <Profissionais />;
-      case "financeiro": return <Financeiro />;
+      case "dashboard":    return <Dashboard />;
+      case "pacientes":    return <Patients />;
+      case "agenda":       return <Agenda />;
+      case "prontuario":   return <Prontuario />;
+      case "profissionais":return <Profissionais />;
+      case "financeiro":   return <Financeiro />;
     }
   };
 
-  if (!loggedIn) {
-    return <Login onLogin={() => setLoggedIn(true)} />;
+  if (!user) {
+    return <Login onLogin={() => {}} />;
   }
+
+  if (user.tipo === "paciente") {
+  return <DashboardPaciente />;
+}
 
   return (
     <div className="flex h-screen bg-background overflow-hidden" style={{ fontFamily: "'Inter', 'DM Sans', sans-serif" }}>
-      {/* Sidebar overlay on mobile */}
+      {/* Sidebar overlay mobile */}
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 flex flex-col bg-sidebar border-r border-sidebar-border w-60 shrink-0 transition-transform lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed lg:static inset-y-0 left-0 z-50 flex flex-col bg-sidebar border-r border-sidebar-border w-60 shrink-0 transition-transform lg:translate-x-0 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
       >
         {/* Logo */}
         <div className="flex items-center gap-3 px-5 py-5 border-b border-sidebar-border">
@@ -78,7 +91,7 @@ export default function App() {
             <Activity size={18} className="text-primary-foreground" />
           </div>
           <div>
-            <p className="font-semibold text-foreground text-sm leading-tight">FisioClinic</p>
+            <p className="font-semibold text-foreground text-sm leading-tight">NIP</p>
             <p className="text-xs text-muted-foreground">Sistema de Gestão</p>
           </div>
           <button className="ml-auto lg:hidden text-muted-foreground" onClick={() => setSidebarOpen(false)}>
@@ -115,13 +128,24 @@ export default function App() {
             <Settings size={17} />
             <span>Configurações</span>
           </button>
+
+          {/* Botão de logout */}
+          <button
+            onClick={logout}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-red-500 hover:bg-red-500/10 transition-colors"
+          >
+            <LogOut size={17} />
+            <span>Sair</span>
+          </button>
+
+          {/* Dados do usuário logado */}
           <div className="flex items-center gap-3 px-3 py-3 mt-1">
             <div className="size-8 rounded-full bg-primary flex items-center justify-center shrink-0">
-              <span className="text-xs text-primary-foreground font-semibold">AD</span>
+              <span className="text-xs text-primary-foreground font-semibold">{initials}</span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">Admin</p>
-              <p className="text-xs text-muted-foreground truncate">admin@clinica.com</p>
+              <p className="text-sm font-medium text-foreground truncate">{user.nome}</p>
+              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
             </div>
           </div>
         </div>
@@ -137,7 +161,12 @@ export default function App() {
             </button>
             <div>
               <h2 className="font-semibold text-foreground">{pageTitles[page]}</h2>
-              <p className="text-xs text-muted-foreground">Clínica de Fisioterapia</p>
+              <p className="text-xs text-muted-foreground">
+                {/* Mostra o perfil se for colaborador */}
+                {user.tipo === "colaborador" && user.perfil
+                  ? `${user.perfil.charAt(0).toUpperCase() + user.perfil.slice(1)}`
+                  : "Núcleo Integrado de Postura"}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -146,7 +175,7 @@ export default function App() {
               <span className="absolute top-1.5 right-1.5 size-2 bg-primary rounded-full" />
             </button>
             <div className="size-8 rounded-full bg-primary flex items-center justify-center">
-              <span className="text-xs text-primary-foreground font-semibold">AD</span>
+              <span className="text-xs text-primary-foreground font-semibold">{initials}</span>
             </div>
           </div>
         </header>

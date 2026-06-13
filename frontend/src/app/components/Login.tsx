@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { Eye, EyeOff, Lock, Mail, ArrowRight, Shield } from "lucide-react";
 import { motion } from "motion/react";
+import { useAuth } from "../context/AuthContext"; // ← importa o hook de autenticação
 
 type LoginProps = {
   onLogin: () => void;
@@ -12,27 +13,59 @@ const features = [
   "Relatórios financeiros em tempo real",
   "Acesso seguro por perfil de usuário",
 ];
+const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
 export function Login({ onLogin }: LoginProps) {
+  const { login } = useAuth(); // ← adiciona
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
+
     if (!email || !password) {
       setError("Preencha todos os campos.");
       return;
     }
+
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const response = await fetch(`${API_URL}/api/login/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, senha: password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const mensagem =
+          data?.erro?.non_field_errors?.[0] ??
+          data?.erro ??
+          "E-mail ou senha inválidos.";
+        setError(mensagem);
+        return;
+      }
+
+      login({
+        token: data.token,
+        tipo: data.tipo,
+        nome: data.nome,
+        email: data.email,
+        perfil: data.perfil ?? null,
+      });
+
+    } catch {
+      setError("Não foi possível conectar ao servidor. Tente novamente.");
+    } finally {
       setLoading(false);
-      onLogin();
-    }, 1200);
+    }
   };
+
 
   return (
     <div className="min-h-screen flex" style={{ fontFamily: "'Inter', 'DM Sans', sans-serif" }}>
@@ -105,6 +138,7 @@ export function Login({ onLogin }: LoginProps) {
           </div>
         </div>
       </div>
+
       <div className="flex-1 flex items-center justify-center bg-background px-6 py-12">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -123,7 +157,7 @@ export function Login({ onLogin }: LoginProps) {
           </div>
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-foreground">Acessar sistema</h2>
-            <p className="text-muted-foreground text-sm mt-1">Entre com suas credenciais para continuar</p>
+            <p className="text-muted-foreground text-sm mt-1">Insira as suas credenciais para continuar</p>
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -202,15 +236,6 @@ export function Login({ onLogin }: LoginProps) {
               )}
             </button>
           </form>
-          <div className="mt-6 bg-secondary/60 rounded-xl px-4 py-3 border border-secondary">
-            <p className="text-xs font-medium text-secondary-foreground mb-1">Acesso demonstração</p>
-            <p className="text-xs text-muted-foreground">
-              E-mail: <span className="font-mono font-medium text-foreground">admin@nip.com</span>
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Senha: <span className="font-mono font-medium text-foreground">nip2026</span>
-            </p>
-          </div>
           <p className="text-center text-xs text-muted-foreground mt-6">
             Problemas de acesso?{' '}
             <button className="text-primary font-medium hover:underline">Contate o suporte</button>

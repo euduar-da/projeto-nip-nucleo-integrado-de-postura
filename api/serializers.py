@@ -215,3 +215,20 @@ class ServicoListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Servico
         fields = ['id', 'nome']
+
+from rest_framework import serializers
+from .models import MovimentacaoFinanceira
+
+
+class MovimentacaoFinanceiraSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MovimentacaoFinanceira
+        fields = [
+            'id',
+            'tipo_transacao',
+            'valor',
+            'data_movimentacao',
+            'servico',
+            'colaborador',
+        ]
+        read_only_fields = ['id', 'colaborador']

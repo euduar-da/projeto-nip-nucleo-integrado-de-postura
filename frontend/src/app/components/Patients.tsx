@@ -431,7 +431,7 @@ export function Patients() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-5 py-4 border-b border-border sticky top-0 bg-card z-10">
-              <h2 className="font-semibold">Ficha do Paciente</h2>
+              <h2 className="font-semibold">Dados do Paciente</h2>
               <button
                 onClick={() => setSelected(null)}
                 className="text-muted-foreground hover:text-foreground"
@@ -477,14 +477,6 @@ export function Patients() {
                 ))}
               </div>
 
-              <div className="flex gap-2">
-                <button className="flex-1 flex items-center justify-center gap-2 bg-primary text-primary-foreground py-2.5 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
-                  <FileText size={15} /> Ver Prontuário
-                </button>
-                <button className="flex-1 flex items-center justify-center gap-2 border border-border py-2.5 rounded-lg text-sm font-medium hover:bg-muted/40 transition-colors">
-                  <Calendar size={15} /> Agendar
-                </button>
-              </div>
             </div>
           </div>
         </div>

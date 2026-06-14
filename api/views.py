@@ -5,9 +5,10 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
-
+from django.db.models import Sum, Q
+from decimal import Decimal
 from .permissions import IsColaborador
-from .models import FichaClinica, Anotacao, Paciente, Colaborador, Sessao, Servico
+from .models import FichaClinica, Anotacao, Paciente, Colaborador, Sessao, Servico, MovimentacaoFinanceira
 from .serializers import (
     LoginSerializer, 
     PacienteCadastroSerializer, 
@@ -17,11 +18,9 @@ from .serializers import (
     PacienteListSerializer,
     SessaoSerializer,
     ServicoListSerializer,
-
+    MovimentacaoFinanceiraSerializer
 )
-from .models import MovimentacaoFinanceira
-from django.db.models import Sum, Q
-from decimal import Decimal
+
 
 class LoginView(APIView):
     """
@@ -322,3 +321,35 @@ class RelatorioView(APIView):
         }
 
         return Response(response, status=status.HTTP_200_OK)
+    
+class MovimentacaoFinanceiraView(APIView):
+    """
+    Cadastra movimentações financeiras.
+    Apenas colaboradores autenticados podem cadastrar.
+    """
+    permission_classes = [IsAuthenticated, IsColaborador]
+
+    def post(self, request):
+        serializer = MovimentacaoFinanceiraSerializer(data=request.data)
+
+        if not serializer.is_valid():
+            return Response(
+                {'erro': serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        movimentacao = serializer.save(
+            colaborador=request.user.colaborador
+        )
+
+        return Response({
+            'mensagem': 'Movimentação financeira cadastrada com sucesso.',
+            'movimentacao': {
+                'id': movimentacao.id,
+                'tipo_transacao': movimentacao.tipo_transacao,
+                'valor': movimentacao.valor,
+                'data_movimentacao': movimentacao.data_movimentacao,
+                'servico': movimentacao.servico.id if movimentacao.servico else None,
+                'colaborador': movimentacao.colaborador.usuario.get_full_name(),
+            }
+        }, status=status.HTTP_201_CREATED)

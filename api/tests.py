@@ -8,7 +8,9 @@ from .models import (
     Usuario,
     Paciente,
     Servico,
-    Exercicio
+    Exercicio,
+    FichaClinica,
+    Sessao
 )
 
 
@@ -223,4 +225,334 @@ class FichaClinicaViewTest(APITestCase):
         self.assertEqual(
             response.status_code,
             status.HTTP_401_UNAUTHORIZED
+        )
+
+from rest_framework.authtoken.models import Token
+from .models import Colaborador
+
+
+class CadastroPacienteApiTest(APITestCase):
+
+    def setUp(self):
+
+        usuario = Usuario.objects.create_user(
+            email='admin@email.com',
+            password='123456',
+            first_name='Admin',
+            last_name='Sistema'
+        )
+
+        Colaborador.objects.create(
+            usuario=usuario,
+            perfil='admin'
+        )
+
+        self.client.force_authenticate(user=usuario)
+
+    def test_cadastrar_paciente(self):
+
+        response = self.client.post(
+            '/api/pacientes/cadastrar/',
+            {
+                'email': 'paciente@email.com',
+                'senha': '123456',
+                'first_name': 'João',
+                'last_name': 'Silva',
+                'cpf': '123.456.789-00',
+                'data_nascimento': '2000-01-01'
+            },
+            format='json'
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED
+        )
+
+
+class CadastroColaboradorApiTest(APITestCase):
+
+    def setUp(self):
+
+        usuario = Usuario.objects.create_user(
+            email='admin@email.com',
+            password='123456',
+            first_name='Admin',
+            last_name='Sistema'
+        )
+
+        Colaborador.objects.create(
+            usuario=usuario,
+            perfil='admin'
+        )
+
+        self.client.force_authenticate(user=usuario)
+
+    def test_cadastrar_colaborador(self):
+
+        response = self.client.post(
+            '/api/colaboradores/cadastrar/',
+            {
+                'email': 'novo@email.com',
+                'senha': '123456',
+                'first_name': 'Maria',
+                'last_name': 'Souza',
+                'perfil': 'recepcionista'
+            },
+            format='json'
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED
+        )
+class FichaClinicaApiTest(APITestCase):
+
+    def setUp(self):
+
+        admin_user = Usuario.objects.create_user(
+            email='admin@email.com',
+            password='123456',
+            first_name='Admin',
+            last_name='Sistema'
+        )
+
+        Colaborador.objects.create(
+            usuario=admin_user,
+            perfil='admin'
+        )
+
+        paciente_user = Usuario.objects.create_user(
+            email='paciente@email.com',
+            password='123456',
+            first_name='João',
+            last_name='Silva'
+        )
+
+        self.paciente = Paciente.objects.create(
+            usuario=paciente_user,
+            cpf='111.111.111-11',
+            data_nascimento='2000-01-01'
+        )
+
+        self.client.force_authenticate(user=admin_user)
+
+    def test_criar_ficha(self):
+
+        response = self.client.post(
+            '/api/fichas/',
+            {
+                'paciente': self.paciente.id
+            },
+            format='json'
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED
+        )
+from .models import Sessao, Servico
+
+
+class ConflitoSessaoTest(APITestCase):
+
+    def test_colaborador_nao_pode_ter_duas_sessoes_mesmo_horario(self):
+
+        usuario = Usuario.objects.create_user(
+            email='fisio@email.com',
+            password='123456',
+            first_name='Fisio',
+            last_name='Teste'
+        )
+
+        colaborador = Colaborador.objects.create(
+            usuario=usuario,
+            perfil='fisioterapeuta'
+        )
+
+        paciente_user = Usuario.objects.create_user(
+            email='paciente@email.com',
+            password='123456',
+            first_name='João',
+            last_name='Silva'
+        )
+
+        paciente = Paciente.objects.create(
+            usuario=paciente_user,
+            cpf='999.999.999-99',
+            data_nascimento='2000-01-01'
+        )
+
+        servico = Servico.objects.create(
+            nome='Fisioterapia',
+            descricao='Teste'
+        )
+
+        Sessao.objects.create(
+            data='2026-12-01',
+            horario='10:00:00',
+            paciente=paciente,
+            servico=servico,
+            colaborador=colaborador
+        )
+
+        from .serializers import SessaoSerializer
+
+        serializer = SessaoSerializer(data={
+            'data': '2026-12-01',
+            'horario': '10:00:00',
+            'paciente': paciente.id,
+            'servico': servico.id,
+            'colaborador': colaborador.id
+        })
+
+        self.assertFalse(serializer.is_valid())
+
+class EmailDuplicadoPacienteTest(APITestCase):
+
+    def test_email_duplicado(self):
+
+        Usuario.objects.create_user(
+            email='teste@email.com',
+            password='123456',
+            first_name='Joao',
+            last_name='Silva'
+        )
+
+        from .serializers import PacienteCadastroSerializer
+
+        serializer = PacienteCadastroSerializer(data={
+            'email': 'teste@email.com',
+            'senha': '123456',
+            'first_name': 'Maria',
+            'last_name': 'Souza',
+            'cpf': '111.111.111-11',
+            'data_nascimento': '2000-01-01'
+        })
+
+        self.assertFalse(serializer.is_valid())
+
+class CpfDuplicadoPacienteTest(APITestCase):
+
+    def test_cpf_duplicado(self):
+
+        usuario = Usuario.objects.create_user(
+            email='paciente@email.com',
+            password='123456',
+            first_name='Joao',
+            last_name='Silva'
+        )
+
+        Paciente.objects.create(
+            usuario=usuario,
+            cpf='123.456.789-00',
+            data_nascimento='2000-01-01'
+        )
+
+        from .serializers import PacienteCadastroSerializer
+
+        serializer = PacienteCadastroSerializer(data={
+            'email': 'novo@email.com',
+            'senha': '123456',
+            'first_name': 'Maria',
+            'last_name': 'Souza',
+            'cpf': '123.456.789-00',
+            'data_nascimento': '2000-01-01'
+        })
+
+        self.assertFalse(serializer.is_valid())
+
+class FichaDuplicadaTest(TestCase):
+
+    def test_paciente_nao_pode_ter_duas_fichas(self):
+
+        usuario = Usuario.objects.create_user(
+            email='paciente@email.com',
+            password='123456',
+            first_name='Joao',
+            last_name='Silva'
+        )
+
+        paciente = Paciente.objects.create(
+            usuario=usuario,
+            cpf='999.999.999-99',
+            data_nascimento='2000-01-01'
+        )
+
+        FichaClinica.objects.create(
+            paciente=paciente
+        )
+
+        from .serializers import FichaClinicaSerializer
+
+        serializer = FichaClinicaSerializer(data={
+            'paciente': paciente.id
+        })
+
+        self.assertFalse(serializer.is_valid())
+
+class LoginDadosInvalidosTest(APITestCase):
+
+    def test_login_sem_senha(self):
+
+        response = self.client.post(
+            '/api/login/',
+            {
+                'email': 'teste@email.com'
+            },
+            format='json'
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_401_UNAUTHORIZED
+        )
+
+class CriarSessaoTest(TestCase):
+
+    def test_criar_sessao(self):
+
+        usuario = Usuario.objects.create_user(
+            email='paciente@email.com',
+            password='123456',
+            first_name='Joao',
+            last_name='Silva'
+        )
+
+        paciente = Paciente.objects.create(
+            usuario=usuario,
+            cpf='111.222.333-44',
+            data_nascimento='2000-01-01'
+        )
+
+        servico = Servico.objects.create(
+            nome='Fisioterapia',
+            descricao='Tratamento'
+        )
+
+        sessao = Sessao.objects.create(
+            data='2026-12-01',
+            horario='10:00:00',
+            paciente=paciente,
+            servico=servico
+        )
+
+        self.assertEqual(
+            sessao.status,
+            'Agendado'
+        )
+
+class ExercicioComMidiaTest(TestCase):
+
+    def test_exercicio_com_url(self):
+
+        exercicio = Exercicio.objects.create(
+            nome='Alongamento',
+            descricao_base='Teste',
+            url_midia='https://youtube.com/video'
+        )
+
+        self.assertEqual(
+            exercicio.url_midia,
+            'https://youtube.com/video'
         )

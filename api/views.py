@@ -7,7 +7,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from .permissions import IsColaborador
-from .models import FichaClinica, Anotacao, Paciente, Colaborador, Sessao
+from .models import FichaClinica, Anotacao, Paciente, Colaborador, Sessao, Prescricao
 from .serializers import (
     LoginSerializer, 
     PacienteCadastroSerializer, 
@@ -15,7 +15,8 @@ from .serializers import (
     FichaClinicaSerializer,
     AnotacaoCriarSerializer,
     PacienteListSerializer,
-    SessaoSerializer 
+    SessaoSerializer,
+    PrescricaoSerializer 
 )
 
 class LoginView(APIView):
@@ -272,3 +273,27 @@ class SessaoView(APIView):
             'mensagem': 'Sessão agendada com sucesso.',
             'sessao': SessaoSerializer(sessao).data
         }, status=status.HTTP_201_CREATED)
+    
+    # ------------------------------------------------------------------
+# NOVO: VISUALIZAÇÃO DE EXERCÍCIOS PARA O PACIENTE
+# ------------------------------------------------------------------
+
+class MeusExerciciosView(APIView):
+    """
+    Retorna apenas as prescrições de exercícios do paciente que está logado.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Validação de segurança: verifica se quem está logado é um paciente
+        if not hasattr(request.user, 'paciente'):
+            return Response(
+                {'erro': 'Acesso negado. Apenas pacientes possuem exercícios para casa.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Filtra as prescrições para trazer APENAS as do paciente logado
+        prescricoes = Prescricao.objects.filter(paciente=request.user.paciente)
+        
+        serializer = PrescricaoSerializer(prescricoes, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

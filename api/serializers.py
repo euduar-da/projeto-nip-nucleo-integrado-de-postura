@@ -1,6 +1,6 @@
 from django.contrib.auth import authenticate
 from rest_framework import serializers
-from .models import Usuario, Colaborador, Paciente, FichaClinica, Anotacao, Sessao, Servico
+from .models import Usuario, Colaborador, Paciente, FichaClinica, Anotacao, Sessao, Servico, Exercicio, Prescricao
 
 # ------------------------------------------------------------------
 # AUTENTICAÇÃO E CADASTROS BASE (Seu código original mantido)
@@ -195,3 +195,21 @@ class SessaoSerializer(serializers.ModelSerializer):
                 )
         
         return data
+    
+    # ------------------------------------------------------------------
+# NOVO: EXERCÍCIOS E PRESCRIÇÕES (PARA CASA)
+# ------------------------------------------------------------------
+
+class ExercicioSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Exercicio
+        fields = ['id', 'nome', 'descricao_base', 'url_midia']
+
+class PrescricaoSerializer(serializers.ModelSerializer):
+    # O many=True e read_only=True trazem a lista completa de exercícios vinculados
+    exercicios = ExercicioSerializer(many=True, read_only=True)
+    paciente_nome = serializers.CharField(source='paciente.usuario.get_full_name', read_only=True)
+
+    class Meta:
+        model = Prescricao
+        fields = ['id', 'paciente_nome', 'series', 'repeticoes', 'exercicios']

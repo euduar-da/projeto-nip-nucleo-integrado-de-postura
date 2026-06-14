@@ -1,5 +1,6 @@
 from django.contrib.auth import authenticate
 from rest_framework import serializers
+from django.utils import timezone
 from .models import Usuario, Colaborador, Paciente, FichaClinica, Anotacao, Sessao, Servico
 
 # ------------------------------------------------------------------
@@ -174,24 +175,43 @@ class SessaoSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'status', 'paciente_nome', 'servico_nome', 'colaborador_nome']
 
     def validate(self, data):
-        """
-        Garante que o mesmo profissional não seja agendado com dois pacientes no mesmo horário.
-        """
         colaborador = data.get('colaborador')
         data_sessao = data.get('data')
         horario_sessao = data.get('horario')
 
-        # Só verifica conflito se um colaborador foi selecionado
-        if colaborador:
-            conflito = Sessao.objects.filter(
-                colaborador=colaborador, 
-                data=data_sessao, 
-                horario=horario_sessao
-            ).exists()
+        hoje = timezone.localdate()
+        agora = timezone.localtime().time()
 
-            if conflito:
-                raise serializers.ValidationError(
-                    "Este colaborador já possui um agendamento para este dia e horário."
-                )
-        
+        if data_sessao < hoje:
+            raise serializers.ValidationError({
+                'data': 'Não é possível agendar uma sessão para uma data anterior à atual.'
+            })
+
+        if data_sessao == hoje and horario_sessao < agora:
+            raise serializers.ValidationError({
+                'horario': 'Não é possível agendar uma sessão em um horário anterior ao horário atual.'
+            })
+
+        if not colaborador:
+            raise serializers.ValidationError({
+                'colaborador': 'Selecione um profissional para a sessão.'
+            })
+
+        conflito = Sessao.objects.filter(
+            colaborador=colaborador,
+            data=data_sessao,
+            horario=horario_sessao
+        ).exclude(
+            status__iexact='Cancelado'
+        ).exists()
+
+        if conflito:
+            raise serializers.ValidationError(
+                "Este colaborador já possui um agendamento para este dia e horário."
+            )
         return data
+    
+class ServicoListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Servico
+        fields = ['id', 'nome']

@@ -7,7 +7,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from .permissions import IsColaborador
-from .models import FichaClinica, Anotacao, Paciente, Colaborador, Sessao
+from .models import FichaClinica, Anotacao, Paciente, Colaborador, Sessao, Servico
 from .serializers import (
     LoginSerializer, 
     PacienteCadastroSerializer, 
@@ -15,7 +15,9 @@ from .serializers import (
     FichaClinicaSerializer,
     AnotacaoCriarSerializer,
     PacienteListSerializer,
-    SessaoSerializer 
+    SessaoSerializer,
+    ServicoListSerializer,
+
 )
 
 class LoginView(APIView):
@@ -272,3 +274,11 @@ class SessaoView(APIView):
             'mensagem': 'Sessão agendada com sucesso.',
             'sessao': SessaoSerializer(sessao).data
         }, status=status.HTTP_201_CREATED)
+    
+class ServicoListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        servicos = Servico.objects.all().order_by('nome')
+        serializer = ServicoListSerializer(servicos, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

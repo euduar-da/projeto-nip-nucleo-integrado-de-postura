@@ -43,10 +43,16 @@ export function Login({ onLogin }: LoginProps) {
       const data = await response.json();
 
       if (!response.ok) {
+        const erros = data?.erro;
+
+        // Trata todos os tipos de erro possíveis do serializer
         const mensagem =
-          data?.erro?.non_field_errors?.[0] ??
-          data?.erro ??
+          erros?.non_field_errors?.[0] ??
+          erros?.email?.[0] ??         // ← adiciona isso
+          erros?.senha?.[0] ??         // ← e isso
+          (typeof erros === "string" ? erros : null) ??
           "E-mail ou senha inválidos.";
+
         setError(mensagem);
         return;
       }
@@ -221,7 +227,7 @@ export function Login({ onLogin }: LoginProps) {
             )}
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || password.length < 6} // ← adiciona essa condição
               className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground py-2.5 rounded-xl text-sm font-semibold hover:bg-primary/90 active:scale-[.98] transition-all disabled:opacity-70 disabled:cursor-not-allowed mt-2"
             >
               {loading ? (

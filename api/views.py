@@ -7,14 +7,15 @@ from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from .permissions import IsColaborador
-from .models import FichaClinica, Anotacao, Paciente, Colaborador
+from .models import FichaClinica, Anotacao, Paciente, Colaborador, Sessao
 from .serializers import (
     LoginSerializer, 
     PacienteCadastroSerializer, 
     ColaboradorCadastroSerializer,
     FichaClinicaSerializer,
     AnotacaoCriarSerializer,
-    PacienteListSerializer
+    PacienteListSerializer,
+    SessaoSerializer 
 )
 
 class LoginView(APIView):
@@ -225,3 +226,49 @@ class ColaboradorListView(APIView):
             'perfil': c.perfil,
         } for c in colaboradores]
         return Response(data, status=status.HTTP_200_OK)
+    
+    # ------------------------------------------------------------------
+# NOVO: AGENDAMENTO DE SESSÕES
+# ------------------------------------------------------------------
+
+class SessaoView(APIView):
+    """
+    Gerencia a listagem da agenda e a marcação de novas Sessões.
+    Pacientes só podem ver e agendar para si mesmos.
+    Colaboradores têm acesso total.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Se quem está logado é um Paciente, filtramos para mostrar SÓ as sessões dele
+        if hasattr(request.user, 'paciente'):
+            sessoes = Sessao.objects.filter(paciente=request.user.paciente).order_by('data', 'horario')
+        # Se for um Colaborador, traz a agenda inteira da clínica
+        else:
+            sessoes = Sessao.objects.all().order_by('data', 'horario')
+            
+        serializer = SessaoSerializer(sessoes, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        # Usamos o .copy() para o Django nos deixar alterar os dados do JSON
+        dados = request.data.copy()
+
+        # TRAVA DE SEGURANÇA: Força o ID do paciente logado, ignorando o que vier no JSON
+        if hasattr(request.user, 'paciente'):
+            dados['paciente'] = request.user.paciente.id
+
+        serializer = SessaoSerializer(data=dados)
+
+        if not serializer.is_valid():
+            return Response(
+                {'erro': serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        sessao = serializer.save()
+
+        return Response({
+            'mensagem': 'Sessão agendada com sucesso.',
+            'sessao': SessaoSerializer(sessao).data
+        }, status=status.HTTP_201_CREATED)

@@ -19,6 +19,9 @@ from .serializers import (
     ServicoListSerializer,
 
 )
+from .models import MovimentacaoFinanceira
+from django.db.models import Sum, Q
+from decimal import Decimal
 
 class LoginView(APIView):
     """
@@ -282,3 +285,40 @@ class ServicoListView(APIView):
         servicos = Servico.objects.all().order_by('nome')
         serializer = ServicoListSerializer(servicos, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class RelatorioView(APIView):
+    """
+    Retorna um relatório financeiro simples com total de entradas, saídas e lucro líquido.
+    Apenas colaboradores autenticados têm acesso.
+    Parâmetros query opcionais: `start` (YYYY-MM-DD), `end` (YYYY-MM-DD).
+    """
+    permission_classes = [IsAuthenticated, IsColaborador]
+
+    def get(self, request):
+        movimentos = MovimentacaoFinanceira.objects.all()
+
+        # filtros opcionais por data
+        start = request.query_params.get('start')
+        end = request.query_params.get('end')
+        if start:
+            movimentos = movimentos.filter(data_movimentacao__gte=start)
+        if end:
+            movimentos = movimentos.filter(data_movimentacao__lte=end)
+
+        entrada_q = Q(tipo_transacao__icontains='entrada') | Q(tipo_transacao__icontains='receita') | Q(tipo_transacao__icontains='credito')
+        saida_q = Q(tipo_transacao__icontains='saida') | Q(tipo_transacao__icontains='despesa') | Q(tipo_transacao__icontains='debito')
+
+        total_entrada = movimentos.filter(entrada_q).aggregate(total=Sum('valor'))['total'] or Decimal('0.00')
+        total_saida = movimentos.filter(saida_q).aggregate(total=Sum('valor'))['total'] or Decimal('0.00')
+
+        lucro = (total_entrada or Decimal('0.00')) - (total_saida or Decimal('0.00'))
+
+        # Serializar como string com duas casas decimais para evitar problemas JSON
+        response = {
+            'total_entrada': f"{total_entrada:.2f}",
+            'total_saida': f"{total_saida:.2f}",
+            'lucro_liquido': f"{lucro:.2f}",
+        }
+
+        return Response(response, status=status.HTTP_200_OK)

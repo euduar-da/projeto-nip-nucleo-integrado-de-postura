@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import ColaboradorListView, LoginView, LogoutView, PacienteCadastroView, ColaboradorCadastroView, FichaClinicaView, AnotacaoCriarView, PacienteListView, PacientePerfilView, SessaoView, ServicoListView
+from .views import ColaboradorListView, LoginView, LogoutView, PacienteCadastroView, ColaboradorCadastroView, FichaClinicaView, AnotacaoCriarView, PacienteListView, PacientePerfilView, SessaoView, ServicoListView, RelatorioView
 
 
 urlpatterns = [
@@ -14,4 +14,5 @@ urlpatterns = [
     path('colaboradores/listar/', ColaboradorListView.as_view(), name='listar-colaboradores'),
     path('sessoes/', SessaoView.as_view(), name='agendamentos'),
     path('servicos/', ServicoListView.as_view(), name='listar-servicos'),
+    path('relatorio/', RelatorioView.as_view(), name='relatorio'),
 ]

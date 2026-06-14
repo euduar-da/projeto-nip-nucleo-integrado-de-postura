@@ -8,7 +8,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.db.models import Sum, Q
 from decimal import Decimal
 from .permissions import IsColaborador
-from .models import FichaClinica, Anotacao, Paciente, Colaborador, Sessao, Servico, MovimentacaoFinanceira
+from .models import FichaClinica, Anotacao, Paciente, Colaborador, Sessao, Servico, MovimentacaoFinanceira, Exercicio, Prescricao
 from .serializers import (
     LoginSerializer, 
     PacienteCadastroSerializer, 
@@ -18,7 +18,9 @@ from .serializers import (
     PacienteListSerializer,
     SessaoSerializer,
     ServicoListSerializer,
-    MovimentacaoFinanceiraSerializer
+    MovimentacaoFinanceiraSerializer,
+    ExercicioSerializer,
+    PrescricaoSerializer
 )
 
 
@@ -353,3 +355,40 @@ class MovimentacaoFinanceiraView(APIView):
                 'colaborador': movimentacao.colaborador.usuario.get_full_name(),
             }
         }, status=status.HTTP_201_CREATED)
+    
+    # ------------------------------------------------------------------
+# EXERCÍCIOS E PRESCRIÇÕES
+# ------------------------------------------------------------------
+
+class ExercicioView(APIView):
+    permission_classes = [IsAuthenticated, IsColaborador]
+
+    def get(self, request):
+        exercicios = Exercicio.objects.all().order_by('nome')
+        serializer = ExercicioSerializer(exercicios, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        serializer = ExercicioSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({'erro': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        
+        serializer.save()
+        return Response({
+            'mensagem': 'Exercício adicionado ao catálogo com sucesso!',
+            'exercicio': serializer.data
+        }, status=status.HTTP_201_CREATED)
+
+class MeusExerciciosView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not hasattr(request.user, 'paciente'):
+            return Response(
+                {'erro': 'Acesso negado. Apenas pacientes possuem exercícios para casa.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        prescricoes = Prescricao.objects.filter(paciente=request.user.paciente)
+        serializer = PrescricaoSerializer(prescricoes, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

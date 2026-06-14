@@ -1,7 +1,7 @@
 from django.contrib.auth import authenticate
 from rest_framework import serializers
 from django.utils import timezone
-from .models import Usuario, Colaborador, Paciente, FichaClinica, Anotacao, Sessao, Servico
+from .models import Usuario, Colaborador, Paciente, FichaClinica, Anotacao, Sessao, Servico, Exercicio, Prescricao
 
 # ------------------------------------------------------------------
 # AUTENTICAÇÃO E CADASTROS BASE (Seu código original mantido)
@@ -232,3 +232,20 @@ class MovimentacaoFinanceiraSerializer(serializers.ModelSerializer):
             'colaborador',
         ]
         read_only_fields = ['id', 'colaborador']
+
+        # ------------------------------------------------------------------
+# EXERCÍCIOS E PRESCRIÇÕES
+# ------------------------------------------------------------------
+
+class ExercicioSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Exercicio
+        fields = ['id', 'nome', 'descricao_base', 'url_midia']
+
+class PrescricaoSerializer(serializers.ModelSerializer):
+    exercicios = ExercicioSerializer(many=True, read_only=True)
+    paciente_nome = serializers.CharField(source='paciente.usuario.get_full_name', read_only=True)
+
+    class Meta:
+        model = Prescricao
+        fields = ['id', 'paciente_nome', 'series', 'repeticoes', 'exercicios']

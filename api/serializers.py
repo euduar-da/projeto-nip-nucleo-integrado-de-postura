@@ -1,6 +1,6 @@
 from django.contrib.auth import authenticate
 from rest_framework import serializers
-from .models import Usuario, Colaborador, Paciente, FichaClinica, Anotacao
+from .models import Usuario, Colaborador, Paciente, FichaClinica, Anotacao, Sessao, Servico
 
 # ------------------------------------------------------------------
 # AUTENTICAÇÃO E CADASTROS BASE (Seu código original mantido)
@@ -151,3 +151,47 @@ class PacienteListSerializer(serializers.ModelSerializer):
 
     def get_email(self, obj):
         return obj.usuario.email
+    
+    # ------------------------------------------------------------------
+# NOVO: AGENDAMENTO DE SESSÕES
+# ------------------------------------------------------------------
+
+class SessaoSerializer(serializers.ModelSerializer):
+    # Nomes amigáveis para facilitar a vida do Front-end
+    paciente_nome = serializers.CharField(source='paciente.usuario.get_full_name', read_only=True)
+    colaborador_nome = serializers.CharField(source='colaborador.usuario.get_full_name', read_only=True, default="Não atribuído")
+    servico_nome = serializers.CharField(source='servico.nome', read_only=True)
+
+    class Meta:
+        model = Sessao
+        fields = [
+            'id', 'data', 'horario', 'status', 
+            'paciente', 'paciente_nome', 
+            'servico', 'servico_nome', 
+            'colaborador', 'colaborador_nome'
+        ]
+        # Status entra como somente leitura porque o banco já define 'Agendado' por padrão
+        read_only_fields = ['id', 'status', 'paciente_nome', 'servico_nome', 'colaborador_nome']
+
+    def validate(self, data):
+        """
+        Garante que o mesmo profissional não seja agendado com dois pacientes no mesmo horário.
+        """
+        colaborador = data.get('colaborador')
+        data_sessao = data.get('data')
+        horario_sessao = data.get('horario')
+
+        # Só verifica conflito se um colaborador foi selecionado
+        if colaborador:
+            conflito = Sessao.objects.filter(
+                colaborador=colaborador, 
+                data=data_sessao, 
+                horario=horario_sessao
+            ).exists()
+
+            if conflito:
+                raise serializers.ValidationError(
+                    "Este colaborador já possui um agendamento para este dia e horário."
+                )
+        
+        return data

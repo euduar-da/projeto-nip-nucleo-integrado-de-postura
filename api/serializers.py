@@ -113,13 +113,18 @@ class AnotacaoSerializer(serializers.ModelSerializer):
 
 class FichaClinicaSerializer(serializers.ModelSerializer):
     anotacoes = AnotacaoSerializer(many=True, read_only=True, source='anotacao_set')
-    # Corrigido o caminho para acessar o nome completo do usuário vinculado ao paciente
     paciente_nome = serializers.CharField(source='paciente.usuario.get_full_name', read_only=True)
+    data_criacao = serializers.SerializerMethodField()
 
     class Meta:
         model = FichaClinica
         fields = ['id', 'data_criacao', 'paciente', 'paciente_nome', 'anotacoes']
         read_only_fields = ['id', 'data_criacao', 'paciente_nome', 'anotacoes']
+
+    def get_data_criacao(self, obj):
+        if hasattr(obj.data_criacao, 'date'):
+            return obj.data_criacao.date().isoformat()
+        return str(obj.data_criacao)
 
     def validate_paciente(self, value):
         if FichaClinica.objects.filter(paciente=value).exists():

@@ -7,7 +7,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from .permissions import IsColaborador
-from .models import FichaClinica, Anotacao, Paciente, Colaborador
+from .models import FichaClinica, Anotacao, Paciente, Colaborador, Sessao
 from .serializers import (
     LoginSerializer, 
     PacienteCadastroSerializer, 

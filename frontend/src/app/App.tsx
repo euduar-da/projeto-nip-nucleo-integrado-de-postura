@@ -24,13 +24,13 @@ import { Profissionais } from "./components/Profissionais";
 import { Financeiro } from "./components/Financeiro";
 import { DashboardPaciente } from "./components/PacienteDashboard";
 
-type Page = "dashboard" | "pacientes" | "agenda" | "prontuario" | "profissionais" | "financeiro";
+type Page = "dashboard" | "pacientes" | "agenda" | "fichas" | "profissionais" | "financeiro";
 
 const navItems = [
   { id: "dashboard" as Page, label: "Dashboard", icon: LayoutDashboard },
   { id: "pacientes" as Page, label: "Pacientes", icon: Users },
   { id: "agenda" as Page, label: "Agenda", icon: Calendar },
-  { id: "prontuario" as Page, label: "Prontuário", icon: FileText },
+  { id: "fichas" as Page, label: "Fichas Clínicas", icon: FileText },
   { id: "profissionais" as Page, label: "Profissionais", icon: UserCheck },
   { id: "financeiro" as Page, label: "Financeiro", icon: DollarSign },
 ];
@@ -39,7 +39,7 @@ const pageTitles: Record<Page, string> = {
   dashboard: "Dashboard",
   pacientes: "Pacientes",
   agenda: "Agenda",
-  prontuario: "Prontuário",
+  fichas: "Fichas Clínicas",
   profissionais: "Profissionais",
   financeiro: "Financeiro",
 };
@@ -58,7 +58,7 @@ export default function App() {
       case "dashboard":    return <Dashboard />;
       case "pacientes":    return <Patients />;
       case "agenda":       return <Agenda />;
-      case "prontuario":   return <Prontuario />;
+      case "fichas":       return <Prontuario />;
       case "profissionais":return <Profissionais />;
       case "financeiro":   return <Financeiro />;
     }

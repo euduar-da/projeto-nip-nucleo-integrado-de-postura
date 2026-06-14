@@ -1,44 +1,113 @@
-import { Users, Calendar, Activity, TrendingUp, Clock, CheckCircle, AlertCircle, ChevronRight } from "lucide-react";
+import { Users, Calendar, Activity, TrendingUp } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
+import { useState, useEffect } from "react";
 
-const statsData = [
-  { mes: "Jan", atendimentos: 142, novos: 18 },
-  { mes: "Fev", atendimentos: 158, novos: 22 },
-  { mes: "Mar", atendimentos: 175, novos: 26 },
-  { mes: "Abr", atendimentos: 163, novos: 19 },
-  { mes: "Mai", atendimentos: 192, novos: 31 },
-  { mes: "Jun", atendimentos: 187, novos: 28 },
-];
-
-const appointmentsToday = [
-  { hora: "08:00", paciente: "Ana Luiza Ferreira", terapeuta: "Dr. Carlos Souza", tipo: "Coluna lombar", status: "confirmado" },
-  { hora: "09:00", paciente: "Roberto Almeida", terapeuta: "Dra. Patrícia Lima", tipo: "Reabilitação pós-op", status: "em_andamento" },
-  { hora: "09:30", paciente: "Fernanda Costa", terapeuta: "Dr. Carlos Souza", tipo: "RPG", status: "aguardando" },
-  { hora: "10:30", paciente: "Marcos Oliveira", terapeuta: "Dra. Juliana Reis", tipo: "Neurológica", status: "confirmado" },
-  { hora: "11:00", paciente: "Camila Santos", terapeuta: "Dra. Patrícia Lima", tipo: "Esportiva", status: "aguardando" },
-];
+const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
 const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
   confirmado: { label: "Confirmado", color: "#0e7490", bg: "#e0f2f7" },
   em_andamento: { label: "Em andamento", color: "#059669", bg: "#d1fae5" },
   aguardando: { label: "Aguardando", color: "#d97706", bg: "#fef3c7" },
+  Agendado: { label: "Agendado", color: "#0e7490", bg: "#e0f2f7" },
+  Cancelado: { label: "Cancelado", color: "#dc2626", bg: "#fee2e2" },
+};
+
+type SessaoHoje = {
+  id: number;
+  data: string;
+  horario: string;
+  status: string;
+  paciente_nome: string;
+  servico_nome: string;
+  colaborador_nome: string | null;
+};
+
+type StatsMes = {
+  mes: string;
+  novos: number;
+  atendimentos: number;
 };
 
 export function Dashboard() {
+  const [totalPacientes, setTotalPacientes] = useState<number | null>(null);
+  const [sessoesHoje, setSessoesHoje] = useState<SessaoHoje[]>([]);
+  const [totalSessoesHoje, setTotalSessoesHoje] = useState<number | null>(null);
+  const [statsData, setStatsData] = useState<StatsMes[]>([]);
+
+  useEffect(() => {
+    const token = localStorage.getItem("nip_token");
+    if (!token) return;
+
+    const hoje = new Date().toISOString().split("T")[0];
+
+    fetch(`${API_URL}/api/pacientes/listar/`, {
+      headers: { Authorization: `Token ${token}` },
+    })
+      .then(res => res.json())
+      .then(data => setTotalPacientes(data.length))
+      .catch(() => {});
+
+    fetch(`${API_URL}/api/sessoes/`, {
+      headers: { Authorization: `Token ${token}` },
+    })
+      .then(res => res.json())
+      .then((data: SessaoHoje[]) => {
+        const hoje_sessoes = data.filter(s => s.data === hoje);
+        setSessoesHoje(hoje_sessoes);
+        setTotalSessoesHoje(hoje_sessoes.length);
+      })
+      .catch(() => {});
+
+    fetch(`${API_URL}/api/estatisticas/`, {
+      headers: { Authorization: `Token ${token}` },
+    })
+      .then(res => res.json())
+      .then(data => setStatsData(data))
+      .catch(() => {});
+  }, []);
+
+  const mesAtual = new Date().getMonth();
+  const atendimentosMesAtual = statsData[mesAtual]?.atendimentos ?? 0;
+  const atendimentosMesAnterior = statsData[mesAtual - 1]?.atendimentos ?? 0;
+  const variacaoAtendimentos = atendimentosMesAnterior > 0
+    ? Math.round(((atendimentosMesAtual - atendimentosMesAnterior) / atendimentosMesAnterior) * 100)
+    : 0;
+
+  const dataAtual = new Date().toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+  const dataAtualCapitalizada = dataAtual.charAt(0).toUpperCase() + dataAtual.slice(1);
+
   return (
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Painel Geral</h1>
-        <p className="text-muted-foreground mt-0.5">Quinta-feira, 11 de junho de 2026</p>
+        <p className="text-muted-foreground mt-0.5">{dataAtualCapitalizada}</p>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Pacientes Ativos", value: "284", icon: Users, change: "+12 este mês", color: "#0e7490", bg: "#e0f2f7" },
-          { label: "Agendamentos Hoje", value: "18", icon: Calendar, change: "3 pendentes", color: "#059669", bg: "#d1fae5" },
-          { label: "Atendimentos / Mês", value: "187", icon: Activity, change: "+8% vs mês ant.", color: "#7c3aed", bg: "#ede9fe" },
-          { label: "Taxa de Retorno", value: "76%", icon: TrendingUp, change: "+3% vs mês ant.", color: "#d97706", bg: "#fef3c7" },
+          {
+            label: "Pacientes Ativos",
+            value: totalPacientes !== null ? String(totalPacientes) : "...",
+            icon: Users,
+            change: "Total cadastrados",
+            color: "#0e7490",
+            bg: "#e0f2f7"
+          },
+          {
+            label: "Agendamentos Hoje",
+            value: totalSessoesHoje !== null ? String(totalSessoesHoje) : "...",
+            icon: Calendar,
+            change: "Sessões do dia",
+            color: "#059669",
+            bg: "#d1fae5"
+          },
         ].map((stat) => (
           <div key={stat.label} className="bg-card rounded-xl p-5 border border-border shadow-sm">
             <div className="flex items-start justify-between">
@@ -55,112 +124,41 @@ export function Dashboard() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Chart */}
-        <div className="lg:col-span-2 bg-card rounded-xl p-5 border border-border shadow-sm">
-          <h3 className="font-semibold text-foreground mb-4">Evolução de Atendimentos</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={statsData}>
-              <defs>
-                <linearGradient id="colorAtend" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#0e7490" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#0e7490" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="mes" tick={{ fontSize: 12, fill: "#6b7280" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 12, fill: "#6b7280" }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 13 }} />
-              <Area type="monotone" dataKey="atendimentos" stroke="#0e7490" strokeWidth={2} fill="url(#colorAtend)" name="Atendimentos" />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Novos pacientes */}
-        <div className="bg-card rounded-xl p-5 border border-border shadow-sm">
-          <h3 className="font-semibold text-foreground mb-4">Novos Pacientes / Mês</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={statsData} barSize={20}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-              <XAxis dataKey="mes" tick={{ fontSize: 12, fill: "#6b7280" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 12, fill: "#6b7280" }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 13 }} />
-              <Bar dataKey="novos" fill="#0e7490" radius={[4, 4, 0, 0]} name="Novos" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Today's schedule */}
+      {/* Agenda de Hoje */}
       <div className="bg-card rounded-xl border border-border shadow-sm">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h3 className="font-semibold text-foreground">Agenda de Hoje</h3>
-          <button className="text-sm text-primary flex items-center gap-1 hover:underline">
-            Ver completa <ChevronRight size={14} />
-          </button>
+          <span className="text-sm text-muted-foreground">
+            {totalSessoesHoje !== null ? `${totalSessoesHoje} sessões` : "..."}
+          </span>
         </div>
         <div className="divide-y divide-border">
-          {appointmentsToday.map((apt, i) => {
-            const s = statusConfig[apt.status];
-            return (
-              <div key={i} className="flex items-center gap-4 px-5 py-3 hover:bg-muted/40 transition-colors">
-                <div className="w-14 shrink-0">
-                  <span className="text-sm font-medium text-foreground">{apt.hora}</span>
+          {sessoesHoje.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              {totalSessoesHoje === null ? "Carregando..." : "Nenhuma sessão agendada para hoje."}
+            </p>
+          ) : (
+            sessoesHoje.map((apt) => {
+              const statusKey = apt.status in statusConfig ? apt.status : "Agendado";
+              const s = statusConfig[statusKey];
+              return (
+                <div key={apt.id} className="flex items-center gap-4 px-5 py-3 hover:bg-muted/40 transition-colors">
+                  <div className="w-14 shrink-0">
+                    <span className="text-sm font-medium text-foreground">{apt.horario.slice(0, 5)}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{apt.paciente_nome}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {apt.servico_nome} · {apt.colaborador_nome ?? "Profissional a definir"}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-xs px-2.5 py-1 rounded-full font-medium" style={{ color: s.color, background: s.bg }}>
+                    {s.label}
+                  </span>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{apt.paciente}</p>
-                  <p className="text-xs text-muted-foreground">{apt.tipo} · {apt.terapeuta}</p>
-                </div>
-                <span
-                  className="shrink-0 text-xs px-2.5 py-1 rounded-full font-medium"
-                  style={{ color: s.color, background: s.bg }}
-                >
-                  {s.label}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Alerts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-card rounded-xl border border-border shadow-sm p-5">
-          <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
-            <Clock size={16} className="text-primary" /> Próximos Vencimentos
-          </h3>
-          {[
-            { nome: "João Pedro Nunes", data: "Hoje", plano: "Convenio Saúde Plus" },
-            { nome: "Mariana Vieira", data: "Amanhã", plano: "Particular" },
-            { nome: "Lucas Rodrigues", data: "13/06", plano: "Unimed" },
-          ].map((item, i) => (
-            <div key={i} className="flex justify-between items-center py-2 border-b border-border last:border-0">
-              <div>
-                <p className="text-sm font-medium">{item.nome}</p>
-                <p className="text-xs text-muted-foreground">{item.plano}</p>
-              </div>
-              <span className={`text-xs font-medium px-2 py-0.5 rounded ${item.data === "Hoje" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>{item.data}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="bg-card rounded-xl border border-border shadow-sm p-5">
-          <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
-            <CheckCircle size={16} className="text-green-600" /> Últimas Altas
-          </h3>
-          {[
-            { nome: "Sandra Meireles", data: "10/06", sessoes: 24 },
-            { nome: "Felipe Gonçalves", data: "09/06", sessoes: 16 },
-            { nome: "Beatriz Cunha", data: "08/06", sessoes: 30 },
-          ].map((item, i) => (
-            <div key={i} className="flex justify-between items-center py-2 border-b border-border last:border-0">
-              <div>
-                <p className="text-sm font-medium">{item.nome}</p>
-                <p className="text-xs text-muted-foreground">{item.sessoes} sessões realizadas</p>
-              </div>
-              <span className="text-xs text-muted-foreground">{item.data}</span>
-            </div>
-          ))}
+              );
+            })
+          )}
         </div>
       </div>
     </div>
